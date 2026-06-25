@@ -30,6 +30,8 @@ If `TFT_HEIGHT==320 && TFT_WIDTH==240`, `CGRAM_OFFSET` is **not** auto-defined, 
 
 ## Configuration
 
+`All_Settings.h` holds the **compile-time defaults**. At boot, [src/RuntimeConfig.cpp](src/RuntimeConfig.cpp) seeds a runtime `cfg` struct from those defaults, then overlays any values stored in NVS (namespace `cyd-weather`) — set by the web-flasher captive portal. The sketch reads `cfg.*` and `currentTZ()` everywhere; **`All_Settings.h` is never re-touched at runtime**. The web-flasher path uses the placeholder strings in `All_Settings.h` (e.g. `"-your-router-name-"`) to detect "unconfigured" — do not change those placeholders.
+
 All user-facing settings live in [src/All_Settings.h](src/All_Settings.h):
 - WiFi credentials (`WIFI_SSID`, `WIFI_PASSWORD`)
 - OpenWeatherMap API key (`api_key`) — free tier, up to 1000 requests/day

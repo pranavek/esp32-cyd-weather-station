@@ -101,6 +101,12 @@ const char* PROGRAM_VERSION = "ESP32 CYD OpenWeatherMap LittleFS V02";
 #include "NTP_Time.h"  // Attached to this sketch, see that tab for library needs
 // Time zone correction library: https://github.com/JChristensen/Timezone
 
+#include "RuntimeConfig.h"
+// Resolve the TIMEZONE #define to a string literal at compile time so we can
+// store the default zone name for the runtime config layer.
+#define _RTC_STR(x)  #x
+#define _RTC_XSTR(x) _RTC_STR(x)
+
 
 /***************************************************************************************
 **                          Define the globals and class instances
@@ -207,6 +213,18 @@ void setup() {
   ledcAttachPin(TFT_BL, 0);
   setBacklight(SCREEN_BRIGHTNESS);
 
+  // Load runtime config (NVS overrides on top of All_Settings.h defaults).
+  // If the user hasn't configured the device yet (either by editing
+  // All_Settings.h or via the captive portal), launch the portal — it
+  // takes over the screen and reboots on save.
+  configBegin(WIFI_SSID, WIFI_PASSWORD,
+              api_key, latitude, longitude, units,
+              _RTC_XSTR(TIMEZONE), &TIMEZONE,
+              NIGHT_OFF_HOUR, NIGHT_ON_HOUR);
+  if (!configIsReady()) {
+    startCaptivePortal();  // never returns
+  }
+
   if (!LittleFS.begin()) {
     Serial.println("Flash FS initialisation failed!");
     while (1) yield();  // Stay here twiddling thumbs waiting
@@ -253,13 +271,13 @@ void setup() {
 
 // Call once for ESP32 and ESP8266
 #if !defined(ARDUINO_ARCH_MBED)
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.begin(cfg.wifiSsid.c_str(), cfg.wifiPassword.c_str());
 #endif
 
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
 #if defined(ARDUINO_ARCH_MBED) || defined(ARDUINO_ARCH_RP2040)
-    if (WiFi.status() != WL_CONNECTED) WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    if (WiFi.status() != WL_CONNECTED) WiFi.begin(cfg.wifiSsid.c_str(), cfg.wifiPassword.c_str());
 #endif
     delay(500);
   }
@@ -281,11 +299,11 @@ void setup() {
 **                          Loop
 ***************************************************************************************/
 void loop() {
-  time_t local_t = TIMEZONE.toLocal(now(), &tz1_Code);
+  time_t local_t = currentTZ()->toLocal(now(), &tz1_Code);
   uint8_t h = hour(local_t);
   uint8_t m = minute(local_t);
   bool nightMode = !booted &&
-                   ((h < NIGHT_ON_HOUR) || (h == NIGHT_OFF_HOUR && m >= 59));
+                   ((h < cfg.nightOnHour) || (h == cfg.nightOffHour && m >= 59));
 
   updateBrightness(nightMode);
 
@@ -339,8 +357,8 @@ void updateData() {
   // Create the structure that holds the retrieved weather
   forecast = new OW_forecast;
 
-  String lat = latitude;
-  String lon = longitude;
+  String lat = cfg.latitude;
+  String lon = cfg.longitude;
 
 #ifdef RANDOM_LOCATION  // Randomly choose a place on Earth to test icons etc
   lat = String(random(180) - 90);
@@ -351,7 +369,7 @@ void updateData() {
   Serial.println(lon);
 #endif
 
-  bool parsed = ow.getForecast(forecast, api_key, lat, lon, units, language);
+  bool parsed = ow.getForecast(forecast, cfg.apiKey, lat, lon, cfg.units, language);
 
   if (parsed) Serial.println("Data points received");
   else Serial.println("Failed to get data points");
@@ -423,7 +441,7 @@ void drawProgress(uint8_t percentage, String text) {
 void drawTime() {
   // Date — redraws every minute so midnight crossover is always correct
   tft.loadFont(AA_FONT_SMALL, LittleFS);
-  time_t local_time = TIMEZONE.toLocal(now(), &tz1_Code);
+  time_t local_time = currentTZ()->toLocal(now(), &tz1_Code);
   String date = String(dayShortStr(weekday(local_time))) + "  " +
                 String(monthShortStr(month(local_time))) + " " +
                 String(day(local_time)) + "  " +
@@ -437,7 +455,7 @@ void drawTime() {
   tft.loadFont(AA_FONT_LARGE, LittleFS);
 
   // Convert UTC to local time, returns zone code in tz1_Code, e.g "GMT"
-  local_time = TIMEZONE.toLocal(now(), &tz1_Code);
+  local_time = currentTZ()->toLocal(now(), &tz1_Code);
 
   String timeNow = "";
 
@@ -497,7 +515,7 @@ void drawCurrentWeather() {
   tft.setTextColor(TFT_YELLOW, TFT_BLACK);
   tft.setTextDatum(TR_DATUM);
   tft.setTextPadding(0);
-  if (units == "metric") tft.drawString("oC", 237, 95);
+  if (cfg.units == "metric") tft.drawString("oC", 237, 95);
   else tft.drawString("oF", 237, 95);
 
   //Temperature large digits added in updateData() to save swapping font here
@@ -505,7 +523,7 @@ void drawCurrentWeather() {
   tft.setTextColor(TFT_ORANGE, TFT_BLACK);
   weatherText = String(forecast->wind_speed[0], 0);
 
-  if (units == "metric") weatherText += " m/s";
+  if (cfg.units == "metric") weatherText += " m/s";
   else weatherText += " mph";
 
   tft.setTextDatum(TC_DATUM);
@@ -513,7 +531,7 @@ void drawCurrentWeather() {
   tft.drawString(weatherText, 124, 136);
 
   float curPressure = forecast->pressure[0];
-  if (units == "imperial") {
+  if (cfg.units == "imperial") {
     weatherText = String(curPressure, 2) + " in";
   } else {
     weatherText = String(curPressure, 0) + " hPa";
@@ -788,14 +806,14 @@ void cacheForecastData(void) {
     dayCache[d].id   = 0;
     dayCache[d].pop  = 0.0f;
   }
-  time_t nowLocal = TIMEZONE.toLocal(now(), &tz1_Code);
+  time_t nowLocal = currentTZ()->toLocal(now(), &tz1_Code);
   int todayDay = day(nowLocal);
   int filled = 0;
   int lastDayKey = todayDay;
   int dayBestSlotIdx = -1;
   uint8_t dayBestHourDist = 24;
   for (int i = 0; i < MAX_DAYS * 8 && filled < 4; i++) {
-    time_t local = TIMEZONE.toLocal(forecast->dt[i], &tz1_Code);
+    time_t local = currentTZ()->toLocal(forecast->dt[i], &tz1_Code);
     int dKey = day(local);
     if (dKey == todayDay) continue;
     if (filled == 0 || dKey != lastDayKey) {
@@ -832,7 +850,7 @@ void cacheForecastData(void) {
   cachedHumidity   = forecast->humidity[0];
   cachedClouds     = forecast->clouds_all[0];
   // Moon
-  time_t local0 = TIMEZONE.toLocal(forecast->dt[0], &tz1_Code);
+  time_t local0 = currentTZ()->toLocal(forecast->dt[0], &tz1_Code);
   int ip;
   cachedMoonIcon     = moon_phase(year(local0), month(local0), day(local0), hour(local0), &ip);
   cachedMoonPhaseIdx = ip;
@@ -1020,7 +1038,7 @@ void printWeather(void) {
 **             Convert Unix time to a "local time" time string "12:34"
 ***************************************************************************************/
 String strTime(time_t unixTime) {
-  time_t local_time = TIMEZONE.toLocal(unixTime, &tz1_Code);
+  time_t local_time = currentTZ()->toLocal(unixTime, &tz1_Code);
 
   String localTime = "";
 
@@ -1037,7 +1055,7 @@ String strTime(time_t unixTime) {
 **  Convert Unix time to a local date + time string "Oct 16 17:18", ends with newline
 ***************************************************************************************/
 String strDate(time_t unixTime) {
-  time_t local_time = TIMEZONE.toLocal(unixTime, &tz1_Code);
+  time_t local_time = currentTZ()->toLocal(unixTime, &tz1_Code);
 
   String localDate = "";
 

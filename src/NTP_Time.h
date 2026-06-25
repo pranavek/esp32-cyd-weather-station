@@ -86,6 +86,10 @@ TimeChangeRule usPDT = {"PDT", Second, dowSunday, Mar, 2, -420};
 TimeChangeRule usPST = {"PST", First, dowSunday, Nov, 2, -480};
 Timezone usPT(usPDT, usPST);
 
+// Zone reference "IST" Indian Standard Time (UTC+5:30, no DST)
+TimeChangeRule inIST = {"IST", First, Sun, Jan, 0, 330};
+Timezone IST(inIST);
+
 
 //====================================================================================
 //                                  Variables

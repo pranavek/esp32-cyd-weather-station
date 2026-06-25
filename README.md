@@ -52,6 +52,12 @@ The bottom section cycles every 15 seconds between two pages.
 └─────────────────────────────┘  ↓ (320 px)
 ```
 
+## Web Flasher (no code edits)
+
+The fastest path: open the [**web flasher**](https://pranavek.github.io/esp32-cyd-weather-station/) in Chrome/Edge, plug in the CYD over USB, click **Install**. The page flashes the firmware + LittleFS image in one shot. On first boot the device opens a WiFi access point called `cyd-weather-setup`; connect to it from a phone and the captive portal walks you through WiFi credentials, OpenWeatherMap API key, location, units, timezone (incl. `IST`), and screen-sleep hours. Settings are saved to NVS — reflashing from the web page (with "erase device" checked) lets you re-run the portal later.
+
+The classic PlatformIO flow below still works exactly as before; values you set in `All_Settings.h` are used as compile-time defaults, and the portal only appears when those are still the placeholders.
+
 ## Getting Started
 
 ### 1. Get an OpenWeatherMap API key
@@ -91,6 +97,7 @@ const String units = "metric";  // or "imperial"
 | `usMT`    | US Mountain (Denver/Salt Lake City) |
 | `usAZ`    | Arizona (Mountain, no DST) |
 | `usPT`    | US Pacific (Los Angeles/Las Vegas) |
+| `IST`     | Indian Standard Time (UTC+5:30, no DST) |
 
 To add a timezone not listed, add `TimeChangeRule` pairs to `NTP_Time.h` following the existing pattern.
 

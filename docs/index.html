@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CYD Weather Web Flasher</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 40rem;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.55;
+    }
+    h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.1rem; margin-top: 2rem; }
+    .lead { color: #555; margin-top: 0; }
+    ol { padding-left: 1.25rem; }
+    ol li { margin: 0.4rem 0; }
+    code {
+      background: #eee;
+      padding: 0.05rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.95em;
+    }
+    .flash-box {
+      text-align: center;
+      padding: 1.25rem 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+      background: #fafafa;
+    }
+    .warn {
+      font-size: 0.85rem;
+      color: #a05a00;
+      margin-top: 0.5rem;
+    }
+    @media (prefers-color-scheme: dark) {
+      body  { background: #1a1a1a; color: #e6e6e6; }
+      .lead { color: #aaa; }
+      code  { background: #2a2a2a; }
+      .flash-box { background: #222; border-color: #444; }
+      .warn { color: #ffb95a; }
+    }
+  </style>
+</head>
+<body>
+  <h1>ESP32 CYD Weather Station</h1>
+  <p class="lead">One-click installer. Flashes firmware + filesystem to the Cheap Yellow Display, then walks you through WiFi + OpenWeather setup from your phone.</p>
+
+  <div class="flash-box">
+    <esp-web-install-button manifest="manifest.json"></esp-web-install-button>
+    <p class="warn">Requires Chrome, Edge, or Opera on desktop. Safari and Firefox don't support Web Serial.</p>
+  </div>
+
+  <h2>How it works</h2>
+  <ol>
+    <li>Plug the CYD into your computer via USB.</li>
+    <li>Click <strong>Connect</strong> above and pick the serial port (Silicon Labs CP210x / CH340 on most CYDs).</li>
+    <li>Click <strong>Install</strong>. Takes about a minute — bootloader, partitions, app, and the LittleFS image (icons + fonts) all flash in one shot.</li>
+    <li>When the device reboots it shows <code>cyd-weather-setup</code> as its WiFi network. Connect from your phone or laptop.</li>
+    <li>A captive portal opens automatically (most phones). Fill in:
+      <ul>
+        <li>your home WiFi</li>
+        <li>your OpenWeatherMap API key (free from <a href="https://openweathermap.org/" rel="noopener">openweathermap.org</a>)</li>
+        <li>latitude / longitude</li>
+        <li>units (metric / imperial)</li>
+        <li>timezone (incl. IST for India)</li>
+        <li>sleep hours (when the screen goes dark)</li>
+      </ul>
+    </li>
+    <li>Save. The device reboots into normal operation and starts drawing weather.</li>
+  </ol>
+
+  <h2>Reconfiguring later</h2>
+  <p>To re-enter the captive portal (e.g. moved to a new WiFi network), erase the NVS partition. Easiest path: re-flash from this page with <em>"erase device"</em> ticked.</p>
+
+  <h2>Prefer to build from source?</h2>
+  <p>The classic PlatformIO install path still works — edit <code>src/All_Settings.h</code> with your values and run <code>pio run -t uploadfs &amp;&amp; pio run -t upload</code>. Source on <a href="https://github.com/pranavek/esp32-cyd-weather-station" rel="noopener">GitHub</a>.</p>
+
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+</body>
+</html>
